@@ -1,0 +1,106 @@
+:root {
+  --bg: #fbfaf7;
+  --fg: #1c1b19;
+  --muted: #5f5b53;
+  --accent: #1f6f4a;
+  --card: #ffffff;
+  --border: #e6e2d9;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141412;
+    --fg: #f1efe9;
+    --muted: #a8a397;
+    --accent: #5cc493;
+    --card: #1d1c19;
+    --border: #2f2d28;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  line-height: 1.5;
+}
+
+.home {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 72px 16px;
+}
+
+.hero {
+  max-width: 640px;
+}
+
+.eyebrow {
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+
+h1 {
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+  line-height: 1.1;
+  margin: 0.25em 0 0.4em;
+}
+
+.lede {
+  color: var(--muted);
+  font-size: 1.15rem;
+}
+
+.steps {
+  list-style: none;
+  padding: 0;
+  margin: 56px 0 0;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.steps li {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.steps h2 {
+  font-size: 1.1rem;
+  margin: 12px 0 4px;
+}
+
+.steps p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.step-number {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 700;
+  font-size: 0.9rem;
+}

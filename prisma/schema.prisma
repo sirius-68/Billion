@@ -1,0 +1,167 @@
+// Billion data model.
+// Money is stored as integer cents (Int). Int is 32-bit in Postgres, which caps a single
+// amount at about $21.4M — far above any bill we expect. Switch to BigInt if that changes.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Keep in sync with BILL_STATUSES in src/domain/bill-lifecycle.ts.
+enum BillStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  VERIFIED
+  FUNDED
+  PAYMENT_SENT
+  PAYMENT_FAILED
+  PAID
+  REJECTED
+  CANCELLED
+  EXPIRED
+}
+
+enum BillerVerification {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum SponsorshipStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum PayoutStatus {
+  PENDING
+  SENT
+  CONFIRMED
+  FAILED
+}
+
+/// Anyone can submit bills and sponsor others' bills; admins also verify.
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String?
+  isAdmin      Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  bills        Bill[]
+  sponsorships Sponsorship[]
+  billEvents   BillEvent[]
+}
+
+/// The organization that receives payment (landlord, utility, hospital, school…).
+model Biller {
+  id                 String             @id @default(cuid())
+  name               String
+  category           String?
+  website            String?
+  addressLine1       String?
+  addressLine2       String?
+  city               String?
+  state              String?            @db.Char(2)
+  postalCode         String?
+  verification       BillerVerification @default(PENDING)
+  /// Identifier at the biller-payment provider, once that rail is chosen (Milestone 4).
+  paymentProviderRef String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  bills              Bill[]
+
+  @@index([name])
+}
+
+model Bill {
+  id                String        @id @default(cuid())
+  submitterId       String
+  billerId          String
+  title             String
+  /// Optional story the submitter chooses to share with sponsors.
+  story             String?
+  /// Account or invoice number at the biller. Sensitive: never shown publicly.
+  accountReference  String
+  amountDueCents    Int
+  amountFundedCents Int           @default(0)
+  currency          String        @default("USD") @db.Char(3)
+  dueDate           DateTime      @db.Date
+  status            BillStatus    @default(DRAFT)
+  /// Storage key of the uploaded bill document used for verification.
+  documentKey       String?
+  rejectionReason   String?
+  submittedAt       DateTime?
+  verifiedAt        DateTime?
+  fundedAt          DateTime?
+  paidAt            DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  submitter         User          @relation(fields: [submitterId], references: [id])
+  biller            Biller        @relation(fields: [billerId], references: [id])
+  sponsorships      Sponsorship[]
+  payouts           Payout[]
+  events            BillEvent[]
+
+  @@index([status, dueDate])
+  @@index([submitterId])
+  @@index([billerId])
+}
+
+model Sponsorship {
+  id                    String            @id @default(cuid())
+  billId                String
+  sponsorId             String
+  amountCents           Int
+  status                SponsorshipStatus @default(PENDING)
+  isAnonymous           Boolean           @default(false)
+  message               String?
+  stripePaymentIntentId String?           @unique
+  refundedAt            DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  bill                  Bill              @relation(fields: [billId], references: [id])
+  sponsor               User              @relation(fields: [sponsorId], references: [id])
+
+  @@index([billId, status])
+  @@index([sponsorId])
+}
+
+/// A payment sent to the biller. A bill can have several if earlier attempts failed.
+model Payout {
+  id                String       @id @default(cuid())
+  billId            String
+  amountCents       Int
+  status            PayoutStatus @default(PENDING)
+  providerReference String?      @unique
+  failureReason     String?
+  sentAt            DateTime?
+  confirmedAt       DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  bill              Bill         @relation(fields: [billId], references: [id])
+
+  @@index([billId])
+}
+
+/// Append-only log of every bill status change.
+model BillEvent {
+  id         String      @id @default(cuid())
+  billId     String
+  fromStatus BillStatus?
+  toStatus   BillStatus
+  /// Null when the change was made by the system (e.g. expiry job, payment webhook).
+  actorId    String?
+  note       String?
+  createdAt  DateTime    @default(now())
+  bill       Bill        @relation(fields: [billId], references: [id])
+  actor      User?       @relation(fields: [actorId], references: [id])
+
+  @@index([billId, createdAt])
+}
